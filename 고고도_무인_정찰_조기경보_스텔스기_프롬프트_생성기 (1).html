@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>고고도 무인 정찰·조기경보 스텔스기 프롬프트 생성기</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: Arial, "Noto Sans KR", sans-serif;
+    background: #0b1020;
+    color: #e8edf7;
+  }
+  .wrap {
+    max-width: 1500px;
+    margin: 0 auto;
+    padding: 24px;
+  }
+  h1 {
+    margin: 0 0 8px;
+    font-size: 28px;
+  }
+  .sub {
+    color: #aab6cf;
+    margin-bottom: 22px;
+  }
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  button, select {
+    border: 1px solid #33415f;
+    border-radius: 10px;
+    padding: 10px 14px;
+    background: #151d32;
+    color: #eef3ff;
+    cursor: pointer;
+  }
+  button:hover, select:hover { background: #1d2944; }
+  .primary {
+    background: #2f64d6;
+    border-color: #3f75e8;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(360px, .65fr);
+    gap: 18px;
+  }
+  .panel {
+    background: #11182a;
+    border: 1px solid #26324b;
+    border-radius: 16px;
+    padding: 16px;
+  }
+  .section {
+    margin-bottom: 18px;
+    border-bottom: 1px solid #222e45;
+    padding-bottom: 16px;
+  }
+  .section:last-child { border-bottom: 0; }
+  .section h2 {
+    font-size: 16px;
+    margin: 0 0 10px;
+  }
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .chip {
+    border: 1px solid #3b4968;
+    background: #151e33;
+    color: #cfd8ea;
+    border-radius: 999px;
+    padding: 7px 10px;
+    cursor: pointer;
+    user-select: none;
+    font-size: 13px;
+  }
+  .chip.active {
+    background: #2457bd;
+    border-color: #4b82ef;
+    color: white;
+  }
+  textarea, input[type="text"] {
+    width: 100%;
+    background: #0d1425;
+    color: #eef3ff;
+    border: 1px solid #33415f;
+    border-radius: 10px;
+    padding: 12px;
+    outline: none;
+  }
+  textarea {
+    min-height: 220px;
+    resize: vertical;
+    line-height: 1.55;
+  }
+  .custom-box {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .output-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .output-title h2 { margin: 0; font-size: 17px; }
+  .counter { color: #8fa0bf; font-size: 12px; }
+  .sticky {
+    position: sticky;
+    top: 16px;
+    align-self: start;
+  }
+  .hint {
+    font-size: 12px;
+    color: #8fa0bf;
+    margin: 8px 0 0;
+  }
+  .footer {
+    margin-top: 20px;
+    color: #7483a0;
+    font-size: 12px;
+    text-align: center;
+  }
+  @media (max-width: 980px) {
+    .grid { grid-template-columns: 1fr; }
+    .sticky { position: static; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>고고도 무인 정찰·조기경보 스텔스기 프롬프트 생성기</h1>
+  <div class="sub">항목별 키워드를 선택하면 Positive Prompt와 Negative Prompt를 자동 생성합니다.</div>
+
+  <div class="toolbar">
+    <select id="presetSelect">
+      <option value="">프리셋 선택</option>
+    </select>
+    <button id="applyPreset">프리셋 적용</button>
+    <button id="selectCore">핵심 키워드 자동 선택</button>
+    <button id="clearAll">전체 초기화</button>
+    <button id="generate" class="primary">프롬프트 생성</button>
+  </div>
+
+  <div class="grid">
+    <div class="panel" id="sections"></div>
+
+    <div class="panel sticky">
+      <div class="output-title">
+        <h2>Positive Prompt</h2>
+        <span class="counter" id="positiveCount">0 chars</span>
+      </div>
+      <textarea id="positiveOutput" placeholder="선택한 키워드로 프롬프트가 생성됩니다."></textarea>
+      <div class="toolbar" style="margin-top:10px;">
+        <button data-copy="positiveOutput">Positive 복사</button>
+      </div>
+
+      <div class="output-title" style="margin-top:18px;">
+        <h2>Negative Prompt</h2>
+        <span class="counter" id="negativeCount">0 chars</span>
+      </div>
+      <textarea id="negativeOutput" placeholder="Negative Constraints가 여기에 생성됩니다."></textarea>
+      <div class="toolbar" style="margin-top:10px;">
+        <button data-copy="negativeOutput">Negative 복사</button>
+        <button id="copyAll">전체 복사</button>
+        <button id="downloadTxt">TXT 저장</button>
+        <button id="downloadHtml">현재 설정 HTML 저장</button>
+      </div>
+
+      <p class="hint">키워드 칩을 다시 클릭하면 선택이 해제됩니다. 각 항목에 직접 키워드도 추가할 수 있습니다.</p>
+    </div>
+  </div>
+
+  <div class="footer">Standalone HTML · No external library · Local browser only</div>
+</div>
+
+<script>
+const SECTIONS = {"1. Aircraft Type / Role": ["고고도 장기체공 무인기", "HALE UAV", "unmanned surveillance aircraft", "stealth reconnaissance UAV", "airborne early warning UAV", "AEW&C drone", "ISR aircraft", "electronic intelligence aircraft", "SIGINT platform", "border surveillance aircraft", "maritime surveillance aircraft", "persistent ISR", "wide-area surveillance", "airborne command and control", "network-centric warfare"], "2. Airframe Configuration": ["high-aspect-ratio wing", "long-span swept wing", "blended fuselage", "low-observable airframe", "streamlined fuselage", "canted twin tail", "V-tail", "tailless configuration", "shielded engine intake", "buried engine", "recessed exhaust", "low-RCS shaping", "aligned leading edges", "flush access panels", "internal landing gear bay", "landing gear fully retracted", "realistic control surfaces", "aerodynamic efficiency", "high-altitude endurance configuration"], "3. Mission Systems": ["AESA radar", "conformal AESA radar", "active electronically scanned array", "side-looking radar", "synthetic aperture radar", "SAR", "GMTI radar", "EO/IR turret", "multispectral sensor", "infrared sensor", "long-range electro-optical camera", "ESM", "ELINT", "SIGINT", "RF receiver", "electronic warfare suite", "passive RF sensor", "SATCOM antenna", "tactical datalink", "secure communications antenna", "beyond-line-of-sight datalink", "phased-array antenna", "sensor fusion system"], "4. Flight Condition": ["high-altitude cruise", "long-endurance patrol", "surveillance orbit", "gentle banking turn", "stable loiter", "border patrol", "maritime patrol", "operational altitude", "landing gear retracted", "subsonic cruise", "turbulent weather", "rain operation", "crosswind condition", "heavy cloud cover", "atmospheric haze", "storm penetration", "persistent surveillance flight"], "5. Operational Environment": ["coastal military airbase", "maritime border", "Korean-style coastline", "mountainous coastline", "archipelago", "island chain", "naval operating area", "military runway", "hardened aircraft shelter", "radar station", "command facility", "coastal defense site", "warships at sea", "patrol vessels", "rough ocean", "mountainous terrain", "remote border region", "strategic maritime corridor"], "6. Camera / Composition": ["cinematic low-angle shot", "three-quarter front view", "air-to-air photography", "aerial establishing shot", "wide-angle aviation photography", "35mm lens", "50mm lens", "telephoto compression", "low camera angle", "aircraft-centered composition", "full aircraft in frame", "wingtip-to-wingtip visibility", "dynamic banking composition", "sensor-focused composition", "wide operational background", "deep depth of field"], "7. Materials / Surface": ["matte dark gray military coating", "low-observable coating", "radar-absorbent material", "RAM coating", "composite skin", "realistic panel lines", "access panels", "flush fasteners", "maintenance hatches", "subtle surface wear", "restrained weathering", "rain streaks", "water droplets", "oil stains", "exhaust staining", "thermal discoloration", "realistic sensor glass", "anti-reflective optical coating", "subtle edge wear"], "8. Lighting / Atmosphere": ["dark cinematic lighting", "overcast sky", "storm clouds", "dusk", "dawn", "blue hour", "diffused light", "backlighting", "rim light", "volumetric clouds", "atmospheric haze", "rain", "mist", "sea spray", "wet surface reflection", "cold ambient light", "subtle warm horizon light", "dramatic cloud break", "restrained navigation lights"], "9. Rendering / Photography": ["photorealistic", "ultra-realistic", "aerospace photography", "military aviation photography", "defense industry concept art", "technical illustration", "physically based rendering", "PBR", "physically accurate lighting", "realistic aerodynamics", "realistic scale", "production-feasible design", "aerospace engineering visualization", "high dynamic range", "HDR", "ultra-detailed", "sharp focus", "high-frequency detail", "8K visual quality", "cinematic realism"], "10. Negative Constraints": ["no text", "no letters", "no captions", "no watermark", "no logos", "no fictional insignia", "no incorrect national markings", "no fantasy aircraft", "no sci-fi spaceship", "no toy-like proportions", "no cartoon", "no anime", "no duplicate wings", "no duplicate engines", "no duplicate antennas", "no duplicate sensors", "no warped fuselage", "no broken geometry", "no impossible aerodynamics", "no impossible mechanical structures", "no oversized radar", "no oversized sensors", "no random sensor placement", "no unrealistic weapons", "no floating components", "no cropped wings", "no cropped tail", "no excessive lens flare", "no excessive motion blur", "no low resolution"]};
+const PRESETS = {"현실형 기본 프리셋": {"1. Aircraft Type / Role": ["HALE UAV", "stealth reconnaissance UAV", "airborne early warning UAV", "persistent ISR"], "2. Airframe Configuration": ["high-aspect-ratio wing", "blended fuselage", "low-RCS shaping", "shielded engine intake", "canted twin tail"], "3. Mission Systems": ["conformal AESA radar", "EO/IR turret", "ESM", "SIGINT", "SATCOM antenna", "tactical datalink", "passive RF sensor"], "4. Flight Condition": ["high-altitude cruise", "long-endurance patrol", "surveillance orbit", "landing gear retracted"], "5. Operational Environment": ["coastal military airbase", "maritime border", "Korean-style coastline", "rough ocean"], "6. Camera / Composition": ["cinematic low-angle shot", "three-quarter front view", "full aircraft in frame", "deep depth of field"], "7. Materials / Surface": ["matte dark gray military coating", "RAM coating", "realistic panel lines", "realistic sensor glass", "subtle surface wear"], "8. Lighting / Atmosphere": ["dark cinematic lighting", "overcast sky", "storm clouds", "atmospheric haze"], "9. Rendering / Photography": ["photorealistic", "military aviation photography", "physically based rendering", "realistic aerodynamics", "sharp focus", "ultra-detailed"], "10. Negative Constraints": ["no text", "no watermark", "no logos", "no fictional insignia", "no fantasy aircraft", "no sci-fi spaceship", "no duplicate wings", "no duplicate engines", "no duplicate sensors", "no impossible aerodynamics", "no oversized radar", "no cropped wings", "no cropped tail", "no excessive motion blur", "no low resolution"]}, "스텔스 조기경보 강화": {"1. Aircraft Type / Role": ["HALE UAV", "airborne early warning UAV", "ISR aircraft", "network-centric warfare"], "2. Airframe Configuration": ["low-observable airframe", "blended fuselage", "low-RCS shaping", "shielded engine intake", "flush access panels", "aligned leading edges"], "3. Mission Systems": ["conformal AESA radar", "active electronically scanned array", "phased-array antenna", "passive RF sensor", "SATCOM antenna", "sensor fusion system"], "4. Flight Condition": ["high-altitude cruise", "stable loiter", "persistent surveillance flight", "landing gear retracted"], "5. Operational Environment": ["maritime border", "strategic maritime corridor", "naval operating area", "mountainous coastline"], "6. Camera / Composition": ["air-to-air photography", "three-quarter front view", "aircraft-centered composition", "wingtip-to-wingtip visibility"], "7. Materials / Surface": ["low-observable coating", "radar-absorbent material", "flush fasteners", "anti-reflective optical coating"], "8. Lighting / Atmosphere": ["blue hour", "dark cinematic lighting", "volumetric clouds", "cold ambient light"], "9. Rendering / Photography": ["ultra-realistic", "aerospace photography", "physically accurate lighting", "production-feasible design", "aerospace engineering visualization"], "10. Negative Constraints": ["no text", "no watermark", "no logos", "no fantasy aircraft", "no toy-like proportions", "no duplicate antennas", "no random sensor placement", "no impossible mechanical structures", "no oversized sensors", "no low resolution"]}};
+
+const sectionWrap = document.getElementById('sections');
+const presetSelect = document.getElementById('presetSelect');
+const positiveOutput = document.getElementById('positiveOutput');
+const negativeOutput = document.getElementById('negativeOutput');
+
+function createUI() {
+  Object.keys(PRESETS).forEach(name => {
+    const opt = document.createElement('option');
+    opt.value = name;
+    opt.textContent = name;
+    presetSelect.appendChild(opt);
+  });
+
+  Object.entries(SECTIONS).forEach(([sectionName, items]) => {
+    const block = document.createElement('div');
+    block.className = 'section';
+    block.dataset.section = sectionName;
+
+    const title = document.createElement('h2');
+    title.textContent = sectionName;
+    block.appendChild(title);
+
+    const chips = document.createElement('div');
+    chips.className = 'chips';
+
+    items.forEach(item => {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'chip';
+      chip.textContent = item;
+      chip.dataset.value = item;
+      chip.addEventListener('click', () => {
+        chip.classList.toggle('active');
+        generatePrompt();
+      });
+      chips.appendChild(chip);
+    });
+    block.appendChild(chips);
+
+    const custom = document.createElement('div');
+    custom.className = 'custom-box';
+    custom.innerHTML = `
+      <input type="text" placeholder="직접 키워드 입력 (쉼표로 여러 개 가능)" />
+      <button type="button">추가</button>
+    `;
+    const input = custom.querySelector('input');
+    const addBtn = custom.querySelector('button');
+    addBtn.addEventListener('click', () => addCustom(block, input));
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') addCustom(block, input);
+    });
+    block.appendChild(custom);
+
+    sectionWrap.appendChild(block);
+  });
+}
+
+function addCustom(block, input) {
+  const values = input.value.split(',').map(v => v.trim()).filter(Boolean);
+  if (!values.length) return;
+  const chips = block.querySelector('.chips');
+  values.forEach(value => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'chip active';
+    chip.textContent = value;
+    chip.dataset.value = value;
+    chip.dataset.custom = 'true';
+    chip.addEventListener('click', () => {
+      chip.classList.toggle('active');
+      generatePrompt();
+    });
+    chips.appendChild(chip);
+  });
+  input.value = '';
+  generatePrompt();
+}
+
+function getSelected() {
+  const result = {};
+  document.querySelectorAll('.section').forEach(section => {
+    const name = section.dataset.section;
+    result[name] = [...section.querySelectorAll('.chip.active')].map(c => c.dataset.value);
+  });
+  return result;
+}
+
+function generatePrompt() {
+  const selected = getSelected();
+  const positiveParts = [];
+  let negative = [];
+
+  Object.entries(selected).forEach(([section, values]) => {
+    if (!values.length) return;
+    if (section === '10. Negative Constraints') negative = values;
+    else positiveParts.push(values.join(', '));
+  });
+
+  positiveOutput.value = positiveParts.join(', ');
+  negativeOutput.value = negative.join(', ');
+  updateCounts();
+}
+
+function updateCounts() {
+  document.getElementById('positiveCount').textContent = positiveOutput.value.length + ' chars';
+  document.getElementById('negativeCount').textContent = negativeOutput.value.length + ' chars';
+}
+
+function clearAll() {
+  document.querySelectorAll('.chip.active').forEach(c => c.classList.remove('active'));
+  positiveOutput.value = '';
+  negativeOutput.value = '';
+  updateCounts();
+}
+
+function applySelection(selection) {
+  clearAll();
+  Object.entries(selection).forEach(([sectionName, values]) => {
+    const block = [...document.querySelectorAll('.section')].find(s => s.dataset.section === sectionName);
+    if (!block) return;
+    values.forEach(value => {
+      let chip = [...block.querySelectorAll('.chip')].find(c => c.dataset.value === value);
+      if (!chip) {
+        chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'chip';
+        chip.textContent = value;
+        chip.dataset.value = value;
+        chip.dataset.custom = 'true';
+        chip.addEventListener('click', () => {
+          chip.classList.toggle('active');
+          generatePrompt();
+        });
+        block.querySelector('.chips').appendChild(chip);
+      }
+      chip.classList.add('active');
+    });
+  });
+  generatePrompt();
+}
+
+document.getElementById('applyPreset').addEventListener('click', () => {
+  const name = presetSelect.value;
+  if (name && PRESETS[name]) applySelection(PRESETS[name]);
+});
+
+document.getElementById('selectCore').addEventListener('click', () => {
+  applySelection(PRESETS['현실형 기본 프리셋']);
+});
+
+document.getElementById('clearAll').addEventListener('click', clearAll);
+document.getElementById('generate').addEventListener('click', generatePrompt);
+
+document.querySelectorAll('[data-copy]').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const id = btn.dataset.copy;
+    const text = document.getElementById(id).value;
+    await navigator.clipboard.writeText(text);
+    const old = btn.textContent;
+    btn.textContent = '복사됨';
+    setTimeout(() => btn.textContent = old, 1000);
+  });
+});
+
+document.getElementById('copyAll').addEventListener('click', async () => {
+  const text = `[Positive Prompt]\n${positiveOutput.value}\n\n[Negative Prompt]\n${negativeOutput.value}`;
+  await navigator.clipboard.writeText(text);
+});
+
+document.getElementById('downloadTxt').addEventListener('click', () => {
+  const text = `[Positive Prompt]\n${positiveOutput.value}\n\n[Negative Prompt]\n${negativeOutput.value}`;
+  const blob = new Blob([text], {type:'text/plain;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'uav_prompt.txt';
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+document.getElementById('downloadHtml').addEventListener('click', () => {
+  const state = getSelected();
+  const clone = document.documentElement.cloneNode(true);
+  const script = document.createElement('script');
+  script.textContent = `window.addEventListener('load',()=>{const saved=${JSON.stringify(state)};setTimeout(()=>applySelection(saved),0);});`;
+  clone.querySelector('body').appendChild(script);
+  const source = '<!DOCTYPE html>\n' + clone.outerHTML;
+  const blob = new Blob([source], {type:'text/html;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'uav_prompt_generator_saved.html';
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+positiveOutput.addEventListener('input', updateCounts);
+negativeOutput.addEventListener('input', updateCounts);
+
+createUI();
+applySelection(PRESETS['현실형 기본 프리셋']);
+</script>
+</body>
+</html>
